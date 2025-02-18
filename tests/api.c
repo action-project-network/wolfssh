@@ -1311,7 +1311,8 @@ static void test_wolfSSH_RealPath(void) { ; }
 
 static void test_wolfSSH_SetAlgoList(void)
 {
-    const char* newKexList = "diffie-hellman-group1-sha1,ecdh-sha2-nistp521";
+    const char* newKexList = "x25519-kyber-512r3-sha256-d00@openquantumsafe.org,"
+                            "diffie-hellman-group1-sha1,ecdh-sha2-nistp521";
     const char* newKeyList = "rsa-sha2-512,ecdsa-sha2-nistp521";
     const char* newCipherList = "aes128-ctr,aes128-cbc";
     const char* newMacList = "hmac-sha1";
