@@ -271,6 +271,114 @@ static int wolfSSH_wolfSSH_Group16_512(void)
 
 #endif
 
+static int wolfSSH_wolfSSH_X25519_Kyber512(void)
+{
+    tcp_ready ready;
+    THREAD_TYPE serverThread;
+    func_args serverArgs;
+    func_args clientArgs;
+    char sA[NUMARGS][ARGLEN];
+    char *serverArgv[NUMARGS] =
+        { sA[0], sA[1], sA[2], sA[3], sA[4], sA[5], sA[6], sA[7], sA[8], sA[9],
+          sA[10], sA[11] };
+    char cA[NUMARGS][ARGLEN];
+    char *clientArgv[NUMARGS] =
+        { cA[0], cA[1], cA[2], cA[3], cA[4] };
+    int serverArgc = 0;
+    int clientArgc = 0;
+
+    WSTARTTCP();
+
+    #if defined(DEBUG_WOLFSSH)
+        wolfSSH_Debugging_ON();
+    #endif
+
+    wolfSSH_Init();
+
+    #if defined(FIPS_VERSION_GE) && FIPS_VERSION_GE(5,2)
+    {
+        int i;
+        for (i = 0; i < FIPS_CAST_COUNT; i++) {
+            wc_RunCast_fips(i);
+        }
+    }
+    #endif /* HAVE_FIPS */
+
+    #if !defined(WOLFSSL_TIRTOS)
+        ChangeToWolfSshRoot();
+    #endif
+
+    InitTcpReady(&ready);
+
+    WSTRNCPY(serverArgv[serverArgc++], "echoserver", ARGLEN);
+    WSTRNCPY(serverArgv[serverArgc++], "-1", ARGLEN);
+    WSTRNCPY(serverArgv[serverArgc++], "-f", ARGLEN);
+    #if !defined(USE_WINDOWS_API) && !defined(WOLFSSH_ZEPHYR)
+        WSTRNCPY(serverArgv[serverArgc++], "-p", ARGLEN);
+        WSTRNCPY(serverArgv[serverArgc++], "-0", ARGLEN);
+    #endif
+    WSTRNCPY(serverArgv[serverArgc++], "-x", ARGLEN);
+    WSTRNCPY(serverArgv[serverArgc++], "x25519-kyber-512r3-sha256-d00@openquantumsafe.org", ARGLEN);
+    WSTRNCPY(serverArgv[serverArgc++], "-m", ARGLEN);
+    WSTRNCPY(serverArgv[serverArgc++], "hmac-sha2-256", ARGLEN);
+    WSTRNCPY(serverArgv[serverArgc++], "-c", ARGLEN);
+    WSTRNCPY(serverArgv[serverArgc++], "aes256-gcm@openssh.com", ARGLEN);
+
+    serverArgs.argc = serverArgc;
+    serverArgs.argv = serverArgv;
+    serverArgs.return_code = EXIT_SUCCESS;
+    serverArgs.signal = &ready;
+    serverArgs.user_auth = NULL;
+    ThreadStart(echoserver_test, &serverArgs, &serverThread);
+    WaitTcpReady(&ready);
+
+    WSTRNCPY(cA[clientArgc++], "client", ARGLEN);
+    WSTRNCPY(cA[clientArgc++], "-u", ARGLEN);
+    WSTRNCPY(cA[clientArgc++], "jill", ARGLEN);
+    #if !defined(USE_WINDOWS_API) && !defined(WOLFSSH_ZEPHYR)
+        WSTRNCPY(cA[clientArgc++], "-p", ARGLEN);
+        WSNPRINTF(cA[clientArgc++], ARGLEN, "%d", ready.port);
+    #endif
+
+    clientArgs.argc = clientArgc;
+    clientArgs.argv = clientArgv;
+    clientArgs.return_code = EXIT_SUCCESS;
+    clientArgs.signal = &ready;
+    clientArgs.user_auth = tsClientUserAuth;
+
+    client_test(&clientArgs);
+
+#ifdef WOLFSSH_ZEPHYR
+    /* Weird deadlock without this sleep */
+    k_sleep(Z_TIMEOUT_TICKS(100));
+#endif
+    ThreadJoin(serverThread);
+
+    if (clientArgs.return_code == WS_SOCKET_ERROR_E) {
+        clientArgs.return_code = WS_SUCCESS;
+    }
+    if (serverArgs.return_code == WS_SOCKET_ERROR_E) {
+        serverArgs.return_code = WS_SUCCESS;
+    }
+#if DEFAULT_HIGHWATER_MARK < 8000
+    if (serverArgs.return_code == WS_REKEYING) {
+        serverArgs.return_code = WS_SUCCESS;
+    }
+    if (serverArgs.return_code == WS_REKEYING) {
+        serverArgs.return_code = WS_SUCCESS;
+    }
+#endif
+    /* Socket error may printf, but this is fine */
+    AssertIntEQ(WS_SUCCESS, clientArgs.return_code);
+    AssertIntEQ(WS_SUCCESS, serverArgs.return_code);
+
+    FreeTcpReady(&ready);
+
+    return EXIT_SUCCESS;
+}
+
+#endif
+
 int wolfSSH_KexTest(int argc, char** argv)
 {
     (void)argc;
@@ -294,6 +402,10 @@ int wolfSSH_KexTest(int argc, char** argv)
 
 #if !defined(WOLFSSH_NO_DH_GROUP16_SHA512) && !defined(WOLFSSH_NO_HMAC_SHA2_512)
     wolfSSH_wolfSSH_Group16_512();
+#endif
+
+#if !defined(WOLFSSH_NO_X25519_KYBER_LEVEL1_SHA256)
+    wolfSSH_wolfSSH_X25519_Kyber512();
 #endif
 
     AssertIntEQ(wolfSSH_Cleanup(), WS_SUCCESS);

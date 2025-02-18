@@ -21,6 +21,8 @@
 #ifndef _WOLFSSH_TESTS_KEX_H_
 #define _WOLFSSH_TESTS_KEX_H_
 
+static int wolfSSH_wolfSSH_Group16_512(void);
+static int wolfSSH_wolfSSH_X25519_Kyber512(void);
 int wolfSSH_KexTest(int argc, char** argv);
 
 #endif /* _WOLFSSH_TESTS_KEX_H_ */
