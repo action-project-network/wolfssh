@@ -1552,6 +1552,9 @@ static void test_wolfSSH_QueryAlgoList(void)
     k = wolfSSH_CheckAlgoName("ssh-rsa");
     AssertIntEQ(WS_SUCCESS, k);
 
+    k = wolfSSH_CheckAlgoName("x25519-kyber-512r3-sha256-d00@openquantumsafe.org");
+    AssertIntEQ(WS_SUCCESS, k);
+
     k = wolfSSH_CheckAlgoName("not-an-algo@wolfssl.com");
     AssertIntEQ(WS_INVALID_ALGO_ID, k);
 }
