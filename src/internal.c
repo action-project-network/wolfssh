@@ -5180,6 +5180,10 @@ static int KeyAgreeCurve25519_client(WOLFSSH* ssh, byte hashId,
  * f - peer public key
  * fSz - peer public key size
  */
+static int KeyAgreeX25519Kyber512_client(WOLFSSH* ssh, byte hashId,
+        const byte* f, word32 fSz)
+#ifndef WOLFSSH_NO_X25519_KYBER_LEVEL1_SHA256
+
 static int KeyAgreeEcdhKyber512_client(WOLFSSH* ssh, byte hashId,
         const byte* f, word32 fSz)
 #ifndef WOLFSSH_NO_ECDH_NISTP256_KYBER_LEVEL1_SHA256
@@ -5310,6 +5314,10 @@ static int KeyAgreeEcdhKyber512_client(WOLFSSH* ssh, byte hashId,
         ForceZero(sharedSecretHash, sharedSecretHashSz);
         WFREE(sharedSecretHash, ssh->ctx->heap, DYNTYPE_PRIVKEY);
     }
+
+    WLOG(WS_LOG_DEBUG, "Leaving KeyAgreeX25519Kyber512_client(), ret = %d", ret);
+    return ret;
+}
 
     WLOG(WS_LOG_DEBUG, "Leaving KeyAgreeEcdhKyber512_client(), ret = %d", ret);
     return ret;
