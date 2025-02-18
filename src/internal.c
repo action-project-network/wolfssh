@@ -3758,6 +3758,10 @@ enum wc_HashType HashForId(byte id)
         case ID_CURVE25519_SHA256:
             return WC_HASH_TYPE_SHA256;
 #endif
+#ifndef WOLFSSH_NO_X25519_KYBER_LEVEL1_SHA256
+        case ID_X25519_KYBER_LEVEL1_SHA256:
+            return WC_HASH_TYPE_SHA256;
+#endif
 #ifndef WOLFSSH_NO_RSA_SHA2_256
         case ID_RSA_SHA2_256:
             return WC_HASH_TYPE_SHA256;
