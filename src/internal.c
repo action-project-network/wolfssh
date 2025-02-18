@@ -12069,6 +12069,12 @@ int SendKexDhReply(WOLFSSH* ssh)
                 msgId = MSGID_KEXKEM_REPLY;
                 break;
 #endif
+#ifndef WOLFSSH_NO_X25519_KYBER_LEVEL1_SHA256
+            case ID_X25519_KYBER_LEVEL1_SHA256:
+                useX25519Kyber = 1;
+                msgId = MSGID_KEXKEM_REPLY;
+                break;
+#endif
             default:
                 ret = WS_INVALID_ALGO_ID;
         }
