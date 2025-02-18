@@ -183,6 +183,11 @@ extern "C" {
     #undef WOLFSSH_NO_CURVE25519_SHA256
     #define WOLFSSH_NO_CURVE25519_SHA256
 #endif
+#if !defined(WOLFSSL_HAVE_KYBER) || defined(NO_SHA256) \
+    || defined(WOLFSSH_NO_CURVE25519_SHA256)
+    #undef WOLFSSH_NO_X25519_KYBER_LEVEL1_SHA256
+    #define WOLFSSH_NO_X25519_KYBER_LEVEL1_SHA256
+#endif
 
 #if defined(WOLFSSH_NO_DH_GROUP1_SHA1) && \
     defined(WOLFSSH_NO_DH_GROUP14_SHA1) && \
@@ -193,7 +198,8 @@ extern "C" {
     defined(WOLFSSH_NO_ECDH_SHA2_NISTP384) && \
     defined(WOLFSSH_NO_ECDH_SHA2_NISTP521) && \
     defined(WOLFSSH_NO_ECDH_NISTP256_KYBER_LEVEL1_SHA256) && \
-    defined(WOLFSSH_NO_CURVE25519_SHA256)
+    defined(WOLFSSH_NO_CURVE25519_SHA256) && \
+    defined(WOLFSSH_NO_X25519_KYBER_LEVEL1_SHA256)
     #error "You need at least one key agreement algorithm."
 #endif
 
@@ -342,6 +348,9 @@ enum {
 #endif
 #ifndef WOLFSSH_NO_CURVE25519_SHA256
     ID_CURVE25519_SHA256,
+#endif
+#ifndef WOLFSSH_NO_X25519_KYBER_LEVEL1_SHA256
+    ID_X25519_KYBER_LEVEL1_SHA256,
 #endif
     ID_EXTINFO_S, /* Pseudo-KEX to indicate server extensions. */
     ID_EXTINFO_C, /* Pseudo-KEX to indicate client extensions. */

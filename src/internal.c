@@ -685,6 +685,12 @@ static const char cannedKexAlgoNames[] =
 #ifndef WOLFSSH_NO_CURVE25519_SHA256
     "curve25519-sha256,"
 #endif
+#if !defined(WOLFSSH_NO_X25519_KYBER_LEVEL1_SHA256)
+    "x25519-kyber-512r3-sha256-d00@openquantumsafe.org,"
+#endif
+#if !defined(WOLFSSH_NO_X25519_KYBER_LEVEL1_SHA256)
+    "x25519-kyber-512r3-sha256-d00@openquantumsafe.org,"
+#endif
 #if !defined(WOLFSSH_NO_ECDH_SHA2_NISTP521)
     "ecdh-sha2-nistp521,"
 #endif
