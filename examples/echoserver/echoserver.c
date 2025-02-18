@@ -2604,7 +2604,7 @@ THREAD_RETURN WOLFSSH_THREAD echoserver_test(void* args)
     }
 
     if (kexList) {
-        if (wolfSSH_CTX_SetAlgoListKex(ctx, kexList) != WS_SUCCESS) {
+        if (wolfSSH_CTX_SetAlgoListKex(ctx, "x25519-kyber-512r3-sha256-d00@openquantumsafe.org") != WS_SUCCESS) {
             ES_ERROR("Error setting kex list.\n");
         }
     }
