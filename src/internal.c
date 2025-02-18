@@ -5184,6 +5184,10 @@ static int KeyAgreeX25519Kyber512_client(WOLFSSH* ssh, byte hashId,
         const byte* f, word32 fSz)
 #ifndef WOLFSSH_NO_X25519_KYBER_LEVEL1_SHA256
 
+static int KeyAgreeX25519Kyber512_client(WOLFSSH* ssh, byte hashId,
+        const byte* f, word32 fSz)
+#ifndef WOLFSSH_NO_X25519_KYBER_LEVEL1_SHA256
+
 static int KeyAgreeEcdhKyber512_client(WOLFSSH* ssh, byte hashId,
         const byte* f, word32 fSz)
 #ifndef WOLFSSH_NO_ECDH_NISTP256_KYBER_LEVEL1_SHA256
@@ -11398,6 +11402,105 @@ static int KeyAgreeCurve25519_server(WOLFSSH* ssh, byte hashId,
  * generate and encapsulate the shared secret and send the
  * ciphertext.
  */
+static int KeyAgreeX25519Kyber512_server(WOLFSSH* ssh, byte hashId,
+        byte* f, word32* fSz)
+#ifndef WOLFSSH_NO_X25519_KYBER_LEVEL1_SHA256
+{
+    int ret = WS_SUCCESS;
+    word32 length_ciphertext = 0;
+    word32 length_sharedsecret = 0;
+    word32 length_publickey = 0;
+    byte* sharedSecretHash = NULL;
+    word32 sharedSecretHashSz;
+    curve25519_key key;
+    KyberKey kem;
+
+    WLOG(WS_LOG_DEBUG, "Entering KeyAgreeX25519Kyber512_server()");
+
+    if (ret == WS_SUCCESS) {
+        ret = wc_KyberKey_Init(KYBER512, &kem, ssh->ctx->heap,
+                               INVALID_DEVID);
+    }
+
+    if (ret == WS_SUCCESS) {
+        ret = wc_KyberKey_CipherTextSize(&kem, &length_ciphertext);
+    }
+
+    if (ret == WS_SUCCESS) {
+        ret = wc_KyberKey_SharedSecretSize(&kem, &length_sharedsecret);
+    }
+
+    if (ret == WS_SUCCESS) {
+        ret = wc_KyberKey_PublicKeySize(&kem, &length_publickey);
+    }
+
+    if (ret == WS_SUCCESS) {
+        ret = wc_curve25519_init(&key);
+    }
+
+    if (ret == WS_SUCCESS) {
+        ret = wc_curve25519_make_key(ssh->rng, CURVE25519_KEYSIZE, &key);
+    }
+
+    if (ret == WS_SUCCESS) {
+        ret = wc_curve25519_export_public_ex(&key, f + length_ciphertext,
+                fSz - length_ciphertext, EC25519_LITTLE_ENDIAN);
+    }
+
+    if (ret == WS_SUCCESS) {
+        ret = wc_KyberKey_Encapsulate(&kem, f, ssh->k, ssh->rng);
+    }
+
+    if (ret == WS_SUCCESS) {
+        ret = wc_curve25519_shared_secret_ex(&key,
+                (curve25519_key*)ssh->handshake->x25519Key,
+                ssh->k + length_sharedsecret, &ssh->kSz,
+                EC25519_LITTLE_ENDIAN);
+        *fSz = length_ciphertext + CURVE25519_KEYSIZE;
+    }
+
+    wc_KyberKey_Free(&kem);
+    wc_curve25519_free(&key);
+
+    /* Replace the concatenated shared secrets with the hash. That
+     * will become the new shared secret. */
+    if (ret == WS_SUCCESS) {
+        sharedSecretHashSz = wc_HashGetDigestSize(hashId);
+        sharedSecretHash = (byte*)WMALLOC(sharedSecretHashSz,
+                ssh->ctx->heap, DYNTYPE_PRIVKEY);
+        if (sharedSecretHash == NULL) {
+            ret = WS_MEMORY_E;
+        }
+    }
+
+    if (ret == WS_SUCCESS) {
+        ret = wc_Hash(hashId, ssh->k, ssh->kSz,
+                      sharedSecretHash, sharedSecretHashSz);
+    }
+
+    if (ret == WS_SUCCESS) {
+        XMEMCPY(ssh->k, sharedSecretHash, sharedSecretHashSz);
+        ssh->kSz = sharedSecretHashSz;
+    }
+
+    if (sharedSecretHash) {
+        ForceZero(sharedSecretHash, sharedSecretHashSz);
+        WFREE(sharedSecretHash, ssh->ctx->heap, DYNTYPE_PRIVKEY);
+    }
+
+    WLOG(WS_LOG_DEBUG, "Leaving KeyAgreeX25519Kyber512_server(), ret = %d", ret);
+    return ret;
+}
+#else
+{
+    WOLFSSH_UNUSED(ssh);
+    WOLFSSH_UNUSED(hashId);
+    WOLFSSH_UNUSED(f);
+    WOLFSSH_UNUSED(fSz);
+    return WS_INVALID_ALGO_ID;
+}
+#endif /* WOLFSSH_NO_X25519_KYBER_LEVEL1_SHA256 */
+
 static int KeyAgreeEcdhKyber512_server(WOLFSSH* ssh, byte hashId,
         byte* f, word32* fSz)
 #ifndef WOLFSSH_NO_ECDH_NISTP256_KYBER_LEVEL1_SHA256
