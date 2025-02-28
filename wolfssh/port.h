@@ -355,7 +355,7 @@ extern "C" {
 #endif
     #define WBADFILE (-1)
     #ifndef NO_WOLFSSH_DIR
-        #define WDIR DIR
+        #define WDIR FATFS_DIR
         #define WOPENDIR(fs,h,c,d)  f_opendir((c),(d))
         #define WCLOSEDIR(fs,d)    f_closedir(d)
     #endif
@@ -1369,7 +1369,7 @@ extern "C" {
 
 #ifndef NO_WOLFSSH_DIR
     #include <dirent.h> /* used for opendir, readdir, and closedir */
-    #define WDIR DIR*
+    #define WDIR FATFS_DIR*
 
     /* returns 0 on success */
     #define WOPENDIR(fs,h,c,d)  ((*(c) = opendir((d))) == NULL)
