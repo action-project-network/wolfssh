@@ -1,0 +1,181 @@
+name: wolfSSH Paramiko SFTP Test
+
+on:
+  push:
+    branches: [ '*' ]
+  pull_request:
+    branches: [ '*' ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_wolfssl:
+    runs-on: ubuntu-latest
+    name: Build wolfSSL
+    timeout-minutes: 5
+    steps:
+      - name: Checkout wolfSSL
+        uses: actions/checkout@v4
+        with:
+          repository: wolfssl/wolfssl
+          path: wolfssl
+
+      - name: Build and install wolfSSL
+        working-directory: ./wolfssl
+        run: |
+          ./autogen.sh
+          ./configure --enable-all
+          make
+          sudo make install
+          sudo ldconfig
+
+  build_wolfssh:
+    needs: build_wolfssl
+    runs-on: ubuntu-latest
+    name: Build wolfSSH and test with Paramiko
+    timeout-minutes: 10
+    steps:
+      - name: Checkout wolfSSH
+        uses: actions/checkout@v4
+        with:
+          path: wolfssh
+
+      - name: Install Paramiko and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          pip3 install paramiko
+
+      - name: Build wolfSSH
+        working-directory: ./wolfssh
+        run: |
+          ./autogen.sh
+          ./configure --enable-all
+          make
+
+      - name: Create test files
+        run: |
+          # Create 20MB test file for upload test
+          dd if=/dev/urandom of=/tmp/upload_test.dat bs=1M count=20
+          echo "Created 20MB test file at /tmp/upload_test.dat"
+          md5sum /tmp/upload_test.dat > /tmp/upload_test.md5
+          
+          # Create 20MB test file for download test
+          dd if=/dev/urandom of=/tmp/download_test.dat bs=1M count=20
+          echo "Created 20MB test file at /tmp/download_test.dat"
+          md5sum /tmp/download_test.dat > /tmp/download_test.md5
+          
+          # Create test directories
+          mkdir -p /tmp/sftp_server_dir
+          mkdir -p /tmp/sftp_client_dir
+          
+          # Copy download test file to server directory
+          cp /tmp/download_test.dat /tmp/sftp_server_dir/
+
+      - name: Create Python test script
+        run: |
+          cat > /tmp/paramiko_sftp_test.py << 'EOF'
+          #!/usr/bin/env python3
+          
+          import os
+          import sys
+          import time
+          import paramiko
+          import subprocess
+          
+          # Configuration
+          HOST = '127.0.0.1'
+          PORT = 22222
+          USERNAME = 'jill'
+          PASSWORD = 'upthehill'
+          
+          # Test file paths
+          UPLOAD_SRC = '/tmp/upload_test.dat'
+          UPLOAD_DST = '/tmp/sftp_server_dir/upload_received.dat'
+          DOWNLOAD_SRC = '/tmp/sftp_server_dir/download_test.dat'
+          DOWNLOAD_DST = '/tmp/sftp_client_dir/download_received.dat'
+          
+          def main():
+              # Wait for server to start
+              print("Waiting for wolfSSH server to start...")
+              time.sleep(3)
+              
+              try:
+                  # Create SSH client
+                  print("Connecting to wolfSSH server...")
+                  client = paramiko.SSHClient()
+                  client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                  client.connect(
+                      hostname=HOST,
+                      port=PORT,
+                      username=USERNAME,
+                      password=PASSWORD,
+                      allow_agent=False,
+                      look_for_keys=False
+                  )
+                  
+                  # Open SFTP session
+                  print("Opening SFTP session...")
+                  sftp = client.open_sftp()
+                  
+                  # Upload test (client to server)
+                  print(f"Uploading 20MB file to server: {UPLOAD_SRC} -> {UPLOAD_DST}")
+                  start_time = time.time()
+                  sftp.put(UPLOAD_SRC, UPLOAD_DST)
+                  upload_time = time.time() - start_time
+                  print(f"Upload completed in {upload_time:.2f} seconds")
+                  
+                  # Download test (server to client)
+                  print(f"Downloading 20MB file from server: {DOWNLOAD_SRC} -> {DOWNLOAD_DST}")
+                  start_time = time.time()
+                  sftp.get(DOWNLOAD_SRC, DOWNLOAD_DST)
+                  download_time = time.time() - start_time
+                  print(f"Download completed in {download_time:.2f} seconds")
+                  
+                  # Close connections
+                  sftp.close()
+                  client.close()
+                  
+                  # Verify upload integrity
+                  print("Verifying upload file integrity...")
+                  upload_result = subprocess.run(['cmp', UPLOAD_SRC, UPLOAD_DST], capture_output=True)
+                  if upload_result.returncode == 0:
+                      print("✅ Upload test PASSED: Files match")
+                  else:
+                      print("❌ Upload test FAILED: Files do not match")
+                      return 1
+                  
+                  # Verify download integrity
+                  print("Verifying download file integrity...")
+                  download_result = subprocess.run(['cmp', DOWNLOAD_SRC, DOWNLOAD_DST], capture_output=True)
+                  if download_result.returncode == 0:
+                      print("✅ Download test PASSED: Files match")
+                  else:
+                      print("❌ Download test FAILED: Files do not match")
+                      return 1
+                  
+                  print("All tests PASSED!")
+                  return 0
+                  
+              except Exception as e:
+                  print(f"Error: {e}")
+                  return 1
+          
+          if __name__ == "__main__":
+              sys.exit(main())
+          EOF
+          
+          chmod +x /tmp/paramiko_sftp_test.py
+
+      - name: Start wolfSSH server
+        working-directory: ./wolfssh
+        run: |
+          # Start the wolfSSH server in the background
+          ./apps/wolfssh/wolfssh -f &
+          echo "wolfSSH server started with PID: $!"
+
+      - name: Run Paramiko SFTP test
+        run: |
+          python3 /tmp/paramiko_sftp_test.py
