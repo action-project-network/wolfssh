@@ -1,0 +1,81 @@
+name: FATFS Test
+
+on:
+  pull_request:
+    branches: [ master ]
+  push:
+    branches: [ master ]
+
+jobs:
+  test-fatfs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential autoconf automake libtool git openssh-server
+      
+      - name: Configure SSH server
+        run: |
+          sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/#PermitEmptyPasswords no/PermitEmptyPasswords yes/' /etc/ssh/sshd_config
+          sudo useradd -m -s /bin/bash test
+          sudo passwd -d test
+          sudo systemctl restart ssh
+      
+      - name: Build wolfSSL
+        run: |
+          git clone https://github.com/wolfSSL/wolfssl.git
+          cd wolfssl
+          ./autogen.sh
+          ./configure --enable-all
+          make
+          sudo make install
+          sudo ldconfig
+      
+      - name: Build FATFS
+        run: |
+          cd ide/Linux-FATFS
+          make
+      
+      - name: Build wolfSSH with FATFS
+        run: |
+          ./autogen.sh
+          ./configure --enable-sftp CFLAGS="-DWOLFSSH_FATFS -Iide/Linux-FATFS -DSTDIN_FILENO=0 -DPRINTF=printf" LDFLAGS="-Lide/Linux-FATFS -lfatfs"
+          make
+      
+      - name: Create test file
+        run: |
+          dd if=/dev/urandom of=/tmp/testfile.bin bs=1024 count=1024
+      
+      - name: Create FATFS image
+        run: |
+          cd examples/sftpclient
+          dd if=/dev/zero of=fatfs_image.img bs=1M count=10
+          mkfs.vfat fatfs_image.img
+      
+      - name: Test SFTP with FATFS
+        run: |
+          cd examples/sftpclient
+          echo "get /tmp/testfile.bin testfile.bin" > commands.txt
+          ./wolfsftp -u test -h 127.0.0.1 < commands.txt
+      
+      - name: Verify file transfer
+        run: |
+          cd examples/sftpclient
+          sudo mkdir -p /mnt/fatfs
+          sudo losetup -f fatfs_image.img
+          LOOP_DEV=$(sudo losetup -j fatfs_image.img | cut -d: -f1)
+          sudo mount $LOOP_DEV /mnt/fatfs
+          ls -la /mnt/fatfs
+          if [ -f /mnt/fatfs/testfile.bin ]; then
+            echo "File transfer successful!"
+            cmp /tmp/testfile.bin /mnt/fatfs/testfile.bin && echo "Files are identical" || echo "Files differ"
+          else
+            echo "File transfer failed!"
+            exit 1
+          fi
+          sudo umount /mnt/fatfs
+          sudo losetup -d $LOOP_DEV

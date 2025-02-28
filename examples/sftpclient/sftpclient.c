@@ -369,6 +369,7 @@ static void ShowUsage(void)
 }
 
 
+#if defined(WOLFSSH_SFTP) && !defined(NO_WOLFSSH_CLIENT)
 /* returns 0 on success */
 static INLINE int SFTP_FPUTS(func_args* args, const char* msg)
 {
@@ -398,6 +399,7 @@ static INLINE char* SFTP_FGETS(func_args* args, char* msg, int msgSz)
 
     return ret;
 }
+#endif /* WOLFSSH_SFTP && !NO_WOLFSSH_CLIENT */
 
 
 /* main loop for handling commands */
